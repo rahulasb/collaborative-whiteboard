@@ -5,6 +5,7 @@ import Logo from './Logo';
 const Board = ({ roomId }) => {
     const canvasRef = useRef(null);
     const [socket, setSocket] = useState(null);
+    const [isConnected, setIsConnected] = useState(false); // Debugging connection state
 
     // State for UI
     const [color, setColor] = useState('#ffffff');
@@ -27,16 +28,33 @@ const Board = ({ roomId }) => {
     useEffect(() => {
         if (!isJoined) return;
 
-        const serverUrl = import.meta.env.PROD
-            ? window.location.origin.replace('5173', '3000')
-            : 'http://localhost:3000';
-
         // In production, we might need a proper URL check
         // If you are deploying the backend separately, replace this with your backend URL
-        const s = io(import.meta.env.VITE_SERVER_URL || 'http://localhost:3000');
+        const connectionUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+        console.log('Attempting to connect to Socket.io server at:', connectionUrl);
+
+        const s = io(connectionUrl, {
+            transports: ['websocket', 'polling'], // Critical for cross-device stability on some networks
+            withCredentials: false
+        });
 
         setSocket(s);
-        s.emit('join-board', roomId);
+
+        s.on('connect', () => {
+            console.log('Socket Connected Successfully:', s.id);
+            setIsConnected(true);
+            s.emit('join-board', roomId);
+        });
+
+        s.on('disconnect', () => {
+            console.warn('Socket Disconnected');
+            setIsConnected(false);
+        });
+
+        s.on('connect_error', (err) => {
+            console.error('Socket Connection Error:', err.message);
+            setIsConnected(false);
+        });
 
         return () => {
             s.disconnect();
@@ -198,7 +216,10 @@ const Board = ({ roomId }) => {
                 <Logo />
                 <div className="title-group">
                     <h1>Collaborative Board</h1>
-                    <div className="subtitle">Real-time Sync</div>
+                    <div className="subtitle">
+                        {isConnected ? <span style={{ color: '#4cd964' }}>● Connected</span> : <span style={{ color: '#ff3b30' }}>● Disconnected</span>}
+                        <span style={{ opacity: 0.5, marginLeft: '8px', fontSize: '10px' }}>Room: {roomId}</span>
+                    </div>
                 </div>
             </div>
 
