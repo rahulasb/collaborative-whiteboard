@@ -9,9 +9,11 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow all origins for simplicity in this demo, restrict in prod
-    methods: ["GET", "POST"]
-  }
+    origin: "*", // Allow all origins
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'] // Explicitly enable both
 });
 
 // Store drawing history per room
@@ -39,23 +41,23 @@ io.on('connection', (socket) => {
   socket.on('draw-stroke', ({ roomId, strokeData }) => {
     // Save to history
     if (!whiteboardState[roomId]) {
-        whiteboardState[roomId] = [];
+      whiteboardState[roomId] = [];
     }
-    
+
     // Add stroke to history
     whiteboardState[roomId].push(strokeData);
-    
+
     // Broadcast to everyone ELSE in the room
     socket.to(roomId).emit('draw-stroke', strokeData);
   });
 
   // 3. Handle Cursor Movement
   socket.on('cursor-move', ({ roomId, cursorData }) => {
-      // Broadcast cursor position (no start/history needed usually)
-      socket.to(roomId).emit('cursor-move', {
-          userId: socket.id,
-          ...cursorData // { x, y, name }
-      });
+    // Broadcast cursor position (no start/history needed usually)
+    socket.to(roomId).emit('cursor-move', {
+      userId: socket.id,
+      ...cursorData // { x, y, name }
+    });
   });
 
   // 4. Handle Clear Canvas
